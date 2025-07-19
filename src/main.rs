@@ -33,7 +33,7 @@ async fn main() {
                 ..Default::default()
             });
 
-            let chat_completion = openai::chat::ChatCompletion::builder("openrouter/google/gemini-2.5-pro", messages).credentials(credentials.clone()).create().await.expect("TODO this will crash the whole program right?");
+            let chat_completion = openai::chat::ChatCompletion::builder("google/gemini-2.5-pro", messages).credentials(credentials.clone()).create().await.expect("TODO this will crash the whole program right?");
 
             eprintln!("{chat_completion:#?}");
             let returned_message = chat_completion.choices.first().unwrap().message.clone();
