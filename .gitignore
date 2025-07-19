@@ -7,3 +7,5 @@ target/
 
 /target
 .aider*
+.env
+.env.backup
