@@ -11,14 +11,19 @@ async fn main() {
     }
 
     let env = envy::from_env::<Env>().expect("failed to deserialize env vars");
-    let credentials =
-        openai::Credentials::new(&env.openrouter_token, "https://openrouter.ai/api/v1");
+
+    let config = async_openai::config::OpenAIConfig::new()
+        .with_api_key(env.openrouter_token)
+        .with_api_base("https://openrouter.ai/api/v1");
+
+    let client = async_openai::Client::with_config(config);
+
     let bot = Bot::new(env.teloxide_token);
 
     let schema = Update::filter_message().endpoint(answer);
 
     Dispatcher::builder(bot, schema)
-        .dependencies(dptree::deps![credentials])
+        .dependencies(dptree::deps![client])
         .build()
         .dispatch()
         .await;
@@ -27,37 +32,46 @@ async fn main() {
 async fn answer(
     bot: Bot,
     msg: Message,
-    credentials: openai::Credentials,
+    client: async_openai::Client<async_openai::config::OpenAIConfig>,
 ) -> Result<(), anyhow::Error> {
-    let mut messages = vec![openai::chat::ChatCompletionMessage {
-            role: openai::chat::ChatCompletionMessageRole::System,
-            content: Some("You're a helpful telegram bot. You don't reply with huge walls of text, but try to be concise and to the point".into()),
-            ..Default::default()
-        }];
+    use async_openai::types::{
+        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
+        CreateChatCompletionRequestArgs,
+    };
+
+    let mut messages = vec![ChatCompletionRequestSystemMessageArgs::default()
+        .content(
+            "You're a helpful telegram bot. You don't reply with huge walls of text, but try to be concise and to the point",
+        )
+        .build()?
+        .into()];
 
     if let Some(text) = msg.text() {
-        messages.push(openai::chat::ChatCompletionMessage {
-            role: openai::chat::ChatCompletionMessageRole::User,
-            content: Some(text.into()),
-            ..Default::default()
-        });
+        messages.push(
+            ChatCompletionRequestUserMessageArgs::default()
+                .content(text)
+                .build()?
+                .into(),
+        );
 
-        let chat_completion =
-            openai::chat::ChatCompletion::builder("google/gemini-2.5-pro", messages)
-                .credentials(credentials.clone())
-                .create()
-                .await?;
+        let request = CreateChatCompletionRequestArgs::default()
+            .model("google/gemini-2.5-pro")
+            .messages(messages)
+            .build()?;
+
+        let chat_completion = client.chat().create(request).await?;
 
         let returned_message = chat_completion
             .choices
             .first()
             .unwrap()
             .message
-            .clone()
             .content
+            .clone()
             .unwrap();
         bot.send_message(msg.chat.id, returned_message).await?;
     }
+
     Ok(())
 }
 
