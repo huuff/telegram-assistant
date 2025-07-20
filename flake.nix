@@ -54,7 +54,7 @@
             treefmt = treefmt-build.wrapper;
           };
         };
-        inherit (nix-checks.lib.${system}) checks;
+        inherit (nix-checks.lib.${system}) checks rustChecks;
       in
       {
         checks = {
@@ -62,7 +62,7 @@
           statix = checks.statix ./.;
           deadnix = checks.deadnix ./.;
           flake-checker = checks.flake-checker ./.;
-          clippy = checks.clippy ./.;
+          clippy = rustChecks.clippy { toolchain = rustPkgs; } ./.;
         };
 
         # for nix fmt
