@@ -1,4 +1,4 @@
-use teloxide::prelude::*;
+use teloxide::{prelude::*, types::User};
 
 #[tokio::main]
 async fn main() {
@@ -20,7 +20,9 @@ async fn main() {
 
     let bot = Bot::new(env.teloxide_token);
 
-    let schema = Update::filter_message().endpoint(answer);
+    let schema = Update::filter_message()
+        .filter_map(|update: Update| update.from().cloned())
+        .endpoint(answer);
 
     Dispatcher::builder(bot, schema)
         .dependencies(dptree::deps![client])
@@ -32,6 +34,7 @@ async fn main() {
 async fn answer(
     bot: Bot,
     msg: Message,
+    user: User,
     client: async_openai::Client<async_openai::config::OpenAIConfig>,
 ) -> Result<(), anyhow::Error> {
     use async_openai::types::{
@@ -59,6 +62,8 @@ async fn answer(
             .messages(messages)
             .build()?;
 
+        bot.send_chat_action(msg.chat.id, teloxide::types::ChatAction::Typing)
+            .await?;
         let chat_completion = client.chat().create(request).await?;
 
         let returned_message = chat_completion
