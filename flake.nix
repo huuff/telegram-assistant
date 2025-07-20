@@ -62,7 +62,7 @@
           statix = checks.statix ./.;
           deadnix = checks.deadnix ./.;
           flake-checker = checks.flake-checker ./.;
-          clippy = rustChecks.clippy { toolchain = rustPkgs; } ./.;
+          clippy = (rustChecks { toolchain = rustPkgs; }).clippy ./.;
         };
 
         # for nix fmt
