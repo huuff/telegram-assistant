@@ -47,6 +47,17 @@ fn display_user(user: &teloxide::types::User) -> String {
     format!("{} ({})", user.full_name(), user.id.0)
 }
 
+/// Sends a typing action forever
+///
+/// Useful to `tokio::select!` this with something else so typing will appear until that's finished
+async fn keep_typing(bot: Bot, chat_id: teloxide::types::ChatId) -> Result<(), anyhow::Error> {
+    loop {
+        bot.send_chat_action(chat_id, teloxide::types::ChatAction::Typing)
+            .await?;
+        tokio::time::sleep(tokio::time::Duration::from_millis(4500)).await;
+    }
+}
+
 #[tracing::instrument(skip_all, fields(user = display_user(&user)))]
 async fn answer(
     bot: Bot,
@@ -72,11 +83,13 @@ async fn answer(
         .messages(chat_history.clone().into_openai())
         .build()?;
 
-    bot.send_chat_action(msg.chat.id, teloxide::types::ChatAction::Typing)
-        .await?;
-    let chat_completion = client.chat().create(request).await?;
+    let chat = client.chat();
+    let response = tokio::select! {
+        msg = chat.create(request) => {msg}
+        _ = keep_typing(bot.clone(), msg.chat.id) => {unreachable!()}
+    }?;
 
-    let returned_message = chat_completion
+    let returned_message = response
         .choices
         .first()
         .unwrap()
