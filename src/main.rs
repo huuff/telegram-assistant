@@ -5,7 +5,7 @@ use std::sync::Arc;
 use chat::{ChatHistory, ChatRepository, InMemoryChatRepository};
 use teloxide::prelude::*;
 
-const DEFAULT_SYSTEM_PROMPT: &str = "You're a helpful telegram bot. You don't reply with huge walls of text, but try to be concise and to the point";
+const DEFAULT_SYSTEM_PROMPT: &str = "You're a helpful telegram bot. You don't reply with huge walls of text, but try to be concise and to the point. Use the MarkdownV2 telegram format for your messages.";
 
 #[tokio::main]
 async fn main() {
@@ -98,7 +98,7 @@ async fn answer(
         .clone()
         .unwrap();
     bot.send_message(msg.chat.id, &returned_message)
-        .send()
+        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
         .await?;
     tracing::info!(event = "sent-message", content = returned_message);
 
