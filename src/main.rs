@@ -9,13 +9,15 @@ const DEFAULT_SYSTEM_PROMPT: &str = "You're a helpful telegram bot. You don't re
 
 #[tokio::main]
 async fn main() {
-    println!("Starting echo bot...");
-
     if cfg!(debug_assertions) {
         dotenvy::dotenv().expect("no .env file");
     } else {
         let _ = dotenvy::dotenv();
     }
+
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     let env = envy::from_env::<Env>().expect("failed to deserialize env vars");
 
@@ -28,8 +30,11 @@ async fn main() {
 
     let bot = Bot::new(env.teloxide_token);
 
-    let schema = Update::filter_message().endpoint(answer);
+    let schema = Update::filter_message()
+        .filter_map(|update: Update| update.from().cloned())
+        .endpoint(answer);
 
+    tracing::info!(event = "startup", "Starting bot...");
     Dispatcher::builder(bot, schema)
         .dependencies(dptree::deps![client, chat_repo])
         .enable_ctrlc_handler()
@@ -38,9 +43,15 @@ async fn main() {
         .await;
 }
 
+fn display_user(user: &teloxide::types::User) -> String {
+    format!("{} ({})", user.full_name(), user.id.0)
+}
+
+#[tracing::instrument(skip_all, fields(user = display_user(&user)))]
 async fn answer(
     bot: Bot,
     msg: Message,
+    user: teloxide::types::User,
     client: async_openai::Client<async_openai::config::OpenAIConfig>,
     chat_repo: Arc<dyn ChatRepository>,
 ) -> Result<(), anyhow::Error> {
@@ -52,6 +63,7 @@ async fn answer(
     };
 
     if let Some(text) = msg.text() {
+        tracing::info!(event = "received-msg", content = text);
         chat_history.push_user_message(text);
     }
 
@@ -75,6 +87,7 @@ async fn answer(
     bot.send_message(msg.chat.id, &returned_message)
         .send()
         .await?;
+    tracing::info!(event = "sent-message", content = returned_message);
 
     chat_history.push_assistant_message(returned_message);
 
