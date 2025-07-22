@@ -21,6 +21,13 @@ async fn main() {
 
     let env = envy::from_env::<Env>().expect("failed to deserialize env vars");
 
+    let allowed_users = env
+        .allowed_users()
+        .into_iter()
+        .map(|it| it.to_owned())
+        .collect::<Vec<_>>();
+    let allowed_users = Arc::new(allowed_users);
+
     let config = async_openai::config::OpenAIConfig::new()
         .with_api_key(env.openrouter_token)
         .with_api_base("https://openrouter.ai/api/v1");
@@ -30,13 +37,11 @@ async fn main() {
 
     let bot = Bot::new(env.teloxide_token);
 
-    let schema = Update::filter_message()
-        .filter_map(|update: Update| update.from().cloned())
-        .endpoint(answer);
+    let schema = Update::filter_message().endpoint(answer);
 
     tracing::info!(event = "startup", "Starting bot...");
     Dispatcher::builder(bot, schema)
-        .dependencies(dptree::deps![client, chat_repo])
+        .dependencies(dptree::deps![client, chat_repo, allowed_users])
         .enable_ctrlc_handler()
         .build()
         .dispatch()
@@ -58,15 +63,24 @@ async fn keep_typing(bot: Bot, chat_id: teloxide::types::ChatId) -> Result<(), a
     }
 }
 
-#[tracing::instrument(skip_all, fields(user = display_user(&user)))]
+#[tracing::instrument(skip_all, fields(user = msg.from.as_ref().map(display_user)))]
 async fn answer(
     bot: Bot,
     msg: Message,
-    user: teloxide::types::User,
     client: async_openai::Client<async_openai::config::OpenAIConfig>,
+    allowed_users: Arc<Vec<String>>,
     chat_repo: Arc<dyn ChatRepository>,
 ) -> Result<(), anyhow::Error> {
     use async_openai::types::CreateChatCompletionRequestArgs;
+
+    if !msg
+        .from
+        .as_ref()
+        .is_some_and(|user| allowed_users.contains(&user.id.0.to_string()))
+    {
+        bot.send_message(msg.chat.id, "FORBIDDEN").await?;
+        return Ok(());
+    }
 
     let mut chat_history = match chat_repo.find(msg.chat.id.0)? {
         Some(chat_history) => chat_history,
@@ -97,9 +111,16 @@ async fn answer(
         .content
         .clone()
         .unwrap();
-    bot.send_message(msg.chat.id, &returned_message)
+
+    if let Err(err) = bot
+        .send_message(msg.chat.id, &returned_message)
         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-        .await?;
+        .await
+    {
+        tracing::error!(event = "sending-error", msg = returned_message, ?err);
+        return Err(err.into());
+    };
+
     tracing::info!(event = "sent-message", content = returned_message);
 
     chat_history.push_assistant_message(returned_message);
@@ -113,4 +134,14 @@ async fn answer(
 struct Env {
     teloxide_token: String,
     openrouter_token: String,
+    allowed_users: Option<String>,
+}
+
+impl Env {
+    pub fn allowed_users(&self) -> Vec<&str> {
+        self.allowed_users
+            .as_ref()
+            .map(|string| string.split(",").collect())
+            .unwrap_or_default()
+    }
 }
