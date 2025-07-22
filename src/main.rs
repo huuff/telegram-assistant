@@ -21,6 +21,13 @@ async fn main() {
 
     let env = envy::from_env::<Env>().expect("failed to deserialize env vars");
 
+    let allowed_users = env
+        .allowed_users()
+        .into_iter()
+        .map(|it| it.to_owned())
+        .collect::<Vec<_>>();
+    let allowed_users = Arc::new(allowed_users);
+
     let config = async_openai::config::OpenAIConfig::new()
         .with_api_key(env.openrouter_token)
         .with_api_base("https://openrouter.ai/api/v1");
@@ -34,7 +41,7 @@ async fn main() {
 
     tracing::info!(event = "startup", "Starting bot...");
     Dispatcher::builder(bot, schema)
-        .dependencies(dptree::deps![client, chat_repo])
+        .dependencies(dptree::deps![client, chat_repo, allowed_users])
         .enable_ctrlc_handler()
         .build()
         .dispatch()
@@ -61,9 +68,19 @@ async fn answer(
     bot: Bot,
     msg: Message,
     client: async_openai::Client<async_openai::config::OpenAIConfig>,
+    allowed_users: Arc<Vec<String>>,
     chat_repo: Arc<dyn ChatRepository>,
 ) -> Result<(), anyhow::Error> {
     use async_openai::types::CreateChatCompletionRequestArgs;
+
+    if !msg
+        .from
+        .as_ref()
+        .is_some_and(|user| allowed_users.contains(&user.id.0.to_string()))
+    {
+        bot.send_message(msg.chat.id, "FORBIDDEN").await?;
+        return Ok(());
+    }
 
     let mut chat_history = match chat_repo.find(msg.chat.id.0)? {
         Some(chat_history) => chat_history,
@@ -117,4 +134,14 @@ async fn answer(
 struct Env {
     teloxide_token: String,
     openrouter_token: String,
+    allowed_users: Option<String>,
+}
+
+impl Env {
+    pub fn allowed_users(&self) -> Vec<&str> {
+        self.allowed_users
+            .as_ref()
+            .map(|string| string.split(",").collect())
+            .unwrap_or_default()
+    }
 }
