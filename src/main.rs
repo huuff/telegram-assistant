@@ -1,11 +1,12 @@
 mod chat;
+mod prompts;
 
 use std::sync::Arc;
 
+use askama::Template;
 use chat::{ChatHistory, ChatRepository, InMemoryChatRepository};
+use prompts::SystemPrompt;
 use teloxide::prelude::*;
-
-const DEFAULT_SYSTEM_PROMPT: &str = "You're a helpful telegram bot. You don't reply with huge walls of text, but try to be concise and to the point. Use the MarkdownV2 telegram format for your messages.";
 
 #[tokio::main]
 async fn main() {
@@ -84,7 +85,7 @@ async fn answer(
 
     let mut chat_history = match chat_repo.find(msg.chat.id.0)? {
         Some(chat_history) => chat_history,
-        None => ChatHistory::new(DEFAULT_SYSTEM_PROMPT),
+        None => ChatHistory::new(SystemPrompt::default().render()?),
     };
 
     if let Some(text) = msg.text() {
