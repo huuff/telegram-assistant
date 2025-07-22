@@ -115,7 +115,7 @@ async fn answer(
 
     if let Err(err) = bot
         .send_message(msg.chat.id, &returned_message)
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+        .parse_mode(teloxide::types::ParseMode::Html)
         .await
     {
         tracing::error!(event = "sending-error", msg = returned_message, ?err);
