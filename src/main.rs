@@ -30,9 +30,7 @@ async fn main() {
 
     let bot = Bot::new(env.teloxide_token);
 
-    let schema = Update::filter_message()
-        .filter_map(|update: Update| update.from().cloned())
-        .endpoint(answer);
+    let schema = Update::filter_message().endpoint(answer);
 
     tracing::info!(event = "startup", "Starting bot...");
     Dispatcher::builder(bot, schema)
@@ -58,11 +56,10 @@ async fn keep_typing(bot: Bot, chat_id: teloxide::types::ChatId) -> Result<(), a
     }
 }
 
-#[tracing::instrument(skip_all, fields(user = display_user(&user)))]
+#[tracing::instrument(skip_all, fields(user = msg.from.as_ref().map(display_user)))]
 async fn answer(
     bot: Bot,
     msg: Message,
-    user: teloxide::types::User,
     client: async_openai::Client<async_openai::config::OpenAIConfig>,
     chat_repo: Arc<dyn ChatRepository>,
 ) -> Result<(), anyhow::Error> {
@@ -97,9 +94,16 @@ async fn answer(
         .content
         .clone()
         .unwrap();
-    bot.send_message(msg.chat.id, &returned_message)
+
+    if let Err(err) = bot
+        .send_message(msg.chat.id, &returned_message)
         .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-        .await?;
+        .await
+    {
+        tracing::error!(event = "sending-error", msg = returned_message, ?err);
+        return Err(err.into());
+    };
+
     tracing::info!(event = "sent-message", content = returned_message);
 
     chat_history.push_assistant_message(returned_message);
