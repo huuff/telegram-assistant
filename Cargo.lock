@@ -1094,26 +1094,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "241eaef5fd12c88705a01fc1066c48c4b36e0dd4377dcdc7ec3942cea7a69956"
 
 [[package]]
-name = "llm-telegram-bot"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "askama",
- "async-openai",
- "derive_more 2.0.1",
- "dotenvy",
- "dptree",
- "envy",
- "jiff",
- "nestify",
- "serde",
- "teloxide",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "lock_api"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2159,6 +2139,26 @@ name = "takecell"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20f34339676cdcab560c9a82300c4c2581f68b9369aedf0fae86f2ff9565ff3e"
+
+[[package]]
+name = "telegram-assistant"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "askama",
+ "async-openai",
+ "derive_more 2.0.1",
+ "dotenvy",
+ "dptree",
+ "envy",
+ "jiff",
+ "nestify",
+ "serde",
+ "teloxide",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "teloxide"
