@@ -1,5 +1,6 @@
 mod chat;
 mod prompts;
+mod trimming;
 
 use std::sync::Arc;
 
@@ -7,6 +8,7 @@ use askama::Template;
 use chat::{ChatHistory, ChatRepository, InMemoryChatRepository};
 use prompts::SystemPrompt;
 use teloxide::prelude::*;
+use trimming::{ChatResettingService, ChatTrimmingService};
 
 #[tokio::main]
 async fn main() {
@@ -35,6 +37,10 @@ async fn main() {
 
     let client = async_openai::Client::with_config(config);
     let chat_repo: Arc<dyn ChatRepository> = Arc::new(InMemoryChatRepository::new());
+    let trimming_svc: Arc<dyn ChatTrimmingService> =
+        Arc::new(ChatResettingService::new(Box::new(|| {
+            SystemPrompt::default().render().unwrap()
+        })));
 
     let bot = Bot::new(env.teloxide_token);
 
@@ -42,7 +48,12 @@ async fn main() {
 
     tracing::info!(event = "startup", "Starting bot...");
     Dispatcher::builder(bot, schema)
-        .dependencies(dptree::deps![client, chat_repo, allowed_users])
+        .dependencies(dptree::deps![
+            client,
+            chat_repo,
+            allowed_users,
+            trimming_svc
+        ])
         .enable_ctrlc_handler()
         .build()
         .dispatch()
@@ -71,6 +82,7 @@ async fn answer(
     client: async_openai::Client<async_openai::config::OpenAIConfig>,
     allowed_users: Arc<Vec<String>>,
     chat_repo: Arc<dyn ChatRepository>,
+    trimming_svc: Arc<dyn ChatTrimmingService>,
 ) -> Result<(), anyhow::Error> {
     use async_openai::types::CreateChatCompletionRequestArgs;
 
@@ -104,17 +116,18 @@ async fn answer(
         _ = keep_typing(bot.clone(), msg.chat.id) => {unreachable!()}
     }?;
 
+    // TODO the try operator would be nice here but I need nightly
     let returned_message = response
         .choices
         .first()
         .unwrap()
         .message
         .content
-        .clone()
+        .as_deref()
         .unwrap();
 
     if let Err(err) = bot
-        .send_message(msg.chat.id, &returned_message)
+        .send_message(msg.chat.id, returned_message)
         .parse_mode(teloxide::types::ParseMode::Html)
         .await
     {
@@ -125,6 +138,11 @@ async fn answer(
     tracing::info!(event = "sent-message", content = returned_message);
 
     chat_history.push_assistant_message(returned_message);
+
+    if chat_history.is_too_long() {
+        chat_history = trimming_svc.trim(chat_history);
+        tracing::warn!(event = "trimmed-chat", "Chat got too long, trimmed it");
+    }
 
     chat_repo.save(msg.chat.id.0, chat_history.clone())?;
 
