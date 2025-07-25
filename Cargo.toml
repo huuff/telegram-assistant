@@ -18,3 +18,5 @@ nestify = { version = "0.3" }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 derive_more = { version = "2", features = ["constructor"] }
+dynosaur = { version = "0.3" }
+trait-variant = { version = "0.1" }

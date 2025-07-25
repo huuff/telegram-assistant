@@ -1,13 +1,6 @@
-use super::model::ChatHistory;
-
 use std::{collections::HashMap, sync::Mutex};
 
-// TODO should be async and use dynosaur
-pub trait ChatRepository: Send + Sync {
-    fn find(&self, id: i64) -> Result<Option<ChatHistory>, anyhow::Error>;
-
-    fn save(&self, id: i64, chat: ChatHistory) -> Result<(), anyhow::Error>;
-}
+use crate::{app::output::repo::ChatRepository, domain::chat::ChatHistory};
 
 pub struct InMemoryChatRepository {
     store: Mutex<HashMap<i64, ChatHistory>>,

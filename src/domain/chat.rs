@@ -25,10 +25,7 @@ impl ChatHistory {
         })
     }
 
-    pub fn push_assistant_message(&mut self, message: impl ToString) {
-        self.messages.push(ChatMessage {
-            sender: ChatMessageSender::Assistant,
-            content: message.to_string(),
-        })
+    pub fn push_message(&mut self, message: ChatMessage) {
+        self.messages.push(message)
     }
 }
