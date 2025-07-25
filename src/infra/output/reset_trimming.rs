@@ -1,10 +1,6 @@
 use derive_more::Constructor;
 
-use crate::chat::ChatHistory;
-
-pub trait ChatTrimmingService: Send + Sync {
-    fn trim(&self, chat_history: ChatHistory) -> ChatHistory;
-}
+use crate::{app::output::trimming::ChatTrimmingService, domain::chat::ChatHistory};
 
 #[derive(Constructor)]
 pub struct ChatResettingService {

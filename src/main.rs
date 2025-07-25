@@ -1,14 +1,21 @@
-mod chat;
-mod prompts;
-mod trimming;
+mod app;
+mod domain;
+mod infra;
 
 use std::sync::Arc;
 
+use app::output::{
+    llm_client::{DynLlmClient, LlmClient},
+    repo::ChatRepository,
+    trimming::ChatTrimmingService,
+};
 use askama::Template;
-use chat::{ChatHistory, ChatRepository, InMemoryChatRepository};
-use prompts::SystemPrompt;
+use domain::prompts::SystemPrompt;
+use infra::output::{
+    mem_repo::InMemoryChatRepository, openai_llm_client::OpenaiLlmClient,
+    reset_trimming::ChatResettingService,
+};
 use teloxide::prelude::*;
-use trimming::{ChatResettingService, ChatTrimmingService};
 
 #[tokio::main]
 async fn main() {
@@ -31,11 +38,10 @@ async fn main() {
         .collect::<Vec<_>>();
     let allowed_users = Arc::new(allowed_users);
 
-    let config = async_openai::config::OpenAIConfig::new()
-        .with_api_key(env.openrouter_token)
-        .with_api_base("https://openrouter.ai/api/v1");
-
-    let client = async_openai::Client::with_config(config);
+    let llm = DynLlmClient::new_arc(OpenaiLlmClient::new(
+        "https://openrouter.ai/api/v1",
+        &env.openrouter_token,
+    ));
     let chat_repo: Arc<dyn ChatRepository> = Arc::new(InMemoryChatRepository::new());
     let trimming_svc: Arc<dyn ChatTrimmingService> =
         Arc::new(ChatResettingService::new(Box::new(|| {
@@ -47,13 +53,9 @@ async fn main() {
     let schema = Update::filter_message().endpoint(answer);
 
     tracing::info!(event = "startup", "Starting bot...");
+    // TODO: need an error handler to log errs?
     Dispatcher::builder(bot, schema)
-        .dependencies(dptree::deps![
-            client,
-            chat_repo,
-            allowed_users,
-            trimming_svc
-        ])
+        .dependencies(dptree::deps![llm, chat_repo, allowed_users, trimming_svc])
         .enable_ctrlc_handler()
         .build()
         .dispatch()
@@ -79,12 +81,12 @@ async fn keep_typing(bot: Bot, chat_id: teloxide::types::ChatId) -> Result<(), a
 async fn answer(
     bot: Bot,
     msg: Message,
-    client: async_openai::Client<async_openai::config::OpenAIConfig>,
+    llm: Arc<DynLlmClient<'static>>,
     allowed_users: Arc<Vec<String>>,
     chat_repo: Arc<dyn ChatRepository>,
     trimming_svc: Arc<dyn ChatTrimmingService>,
 ) -> Result<(), anyhow::Error> {
-    use async_openai::types::CreateChatCompletionRequestArgs;
+    use crate::domain::chat::ChatHistory;
 
     if !msg
         .from
@@ -105,39 +107,23 @@ async fn answer(
         chat_history.push_user_message(text);
     }
 
-    let request = CreateChatCompletionRequestArgs::default()
-        .model("google/gemini-2.5-pro")
-        .messages(chat_history.clone().into_openai())
-        .build()?;
-
-    let chat = client.chat();
-    let response = tokio::select! {
-        msg = chat.create(request) => {msg}
-        _ = keep_typing(bot.clone(), msg.chat.id) => {unreachable!()}
+    let llm_response = tokio::select! {
+        msg = llm.get_response(&chat_history) => { msg }
+        _ = keep_typing(bot.clone(), msg.chat.id) => { unreachable!() }
     }?;
 
-    // TODO the try operator would be nice here but I need nightly
-    let returned_message = response
-        .choices
-        .first()
-        .unwrap()
-        .message
-        .content
-        .as_deref()
-        .unwrap();
-
     if let Err(err) = bot
-        .send_message(msg.chat.id, returned_message)
+        .send_message(msg.chat.id, &llm_response.content)
         .parse_mode(teloxide::types::ParseMode::Html)
         .await
     {
-        tracing::error!(event = "sending-error", msg = returned_message, ?err);
+        tracing::error!(event = "sending-error", msg = llm_response.content, ?err);
         return Err(err.into());
     };
 
-    tracing::info!(event = "sent-message", content = returned_message);
+    tracing::info!(event = "sent-message", content = llm_response.content);
 
-    chat_history.push_assistant_message(returned_message);
+    chat_history.push_message(llm_response);
 
     if chat_history.is_too_long() {
         chat_history = trimming_svc.trim(chat_history);
