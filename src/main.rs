@@ -94,6 +94,7 @@ async fn answer(
         .is_some_and(|user| allowed_users.contains(&user.id.0.to_string()))
     {
         bot.send_message(msg.chat.id, "FORBIDDEN").await?;
+        tracing::info!(event = "unauthorized", "Rejected message");
         return Ok(());
     }
 
