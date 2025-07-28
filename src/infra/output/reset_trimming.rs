@@ -1,15 +1,19 @@
+use crate::SystemPrompt;
 use derive_more::Constructor;
 
 use crate::{app::output::trimming::ChatTrimmingService, domain::chat::ChatHistory};
 
 #[derive(Constructor)]
-pub struct ChatResettingService {
-    system_prompt_factory: Box<dyn Fn() -> String + Send + Sync>,
-}
+pub struct ChatResettingService;
 
 impl ChatTrimmingService for ChatResettingService {
-    fn trim(&self, _: ChatHistory) -> ChatHistory {
-        ChatHistory::new((self.system_prompt_factory)())
+    fn trim(&self, history: ChatHistory) -> ChatHistory {
+        ChatHistory::new(
+            history.user.clone(),
+            // TODO: it'd be cool to make this configurable, perhaps there should be a
+            // prompt factory that receives a generic context? (chat/user)
+            SystemPrompt::builder().user(history.user).build(),
+        )
     }
 }
 

@@ -83,6 +83,7 @@
               # rust
               rustPkgs
               cargo-expand # see macro expansions
+              cargo-insta # for snapshot tests
 
               # nix
               nil

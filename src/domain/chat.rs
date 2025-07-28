@@ -1,6 +1,9 @@
+use super::user::User;
+
 nestify::nest! {
     #[derive(Debug, Clone)]*
     pub struct ChatHistory {
+        pub user: User,
         pub system_prompt: String,
         pub messages: Vec<pub struct ChatMessage {
             #>[derive(Copy)]
@@ -11,10 +14,11 @@ nestify::nest! {
 }
 
 impl ChatHistory {
-    pub fn new(system_prompt: impl ToString) -> Self {
+    pub fn new(user: User, system_prompt: impl ToString) -> Self {
         Self {
+            user,
             system_prompt: system_prompt.to_string(),
-            messages: Default::default(),
+            messages: Vec::default(),
         }
     }
 

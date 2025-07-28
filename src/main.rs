@@ -10,7 +10,7 @@ use app::output::{
     trimming::ChatTrimmingService,
 };
 use askama::Template;
-use domain::prompts::SystemPrompt;
+use domain::{prompts::SystemPrompt, user::User};
 use infra::output::{
     mem_repo::InMemoryChatRepository, openai_llm_client::OpenaiLlmClient,
     reset_trimming::ChatResettingService,
@@ -43,10 +43,7 @@ async fn main() {
         &env.openrouter_token,
     ));
     let chat_repo: Arc<dyn ChatRepository> = Arc::new(InMemoryChatRepository::new());
-    let trimming_svc: Arc<dyn ChatTrimmingService> =
-        Arc::new(ChatResettingService::new(Box::new(|| {
-            SystemPrompt::default().render().unwrap()
-        })));
+    let trimming_svc: Arc<dyn ChatTrimmingService> = Arc::new(ChatResettingService::new());
 
     let bot = Bot::new(env.teloxide_token);
 
@@ -88,11 +85,13 @@ async fn answer(
 ) -> Result<(), anyhow::Error> {
     use crate::domain::chat::ChatHistory;
 
-    if !msg
-        .from
-        .as_ref()
-        .is_some_and(|user| allowed_users.contains(&user.id.0.to_string()))
-    {
+    let user = User::try_from(
+        msg.from
+            .clone()
+            .ok_or(anyhow::anyhow!("message without an user"))?,
+    )?;
+
+    if !allowed_users.contains(&user.id) {
         bot.send_message(msg.chat.id, "FORBIDDEN").await?;
         tracing::info!(event = "unauthorized", "Rejected message");
         return Ok(());
@@ -100,7 +99,14 @@ async fn answer(
 
     let mut chat_history = match chat_repo.find(msg.chat.id.0)? {
         Some(chat_history) => chat_history,
-        None => ChatHistory::new(SystemPrompt::default().render()?),
+        None => ChatHistory::new(
+            // TODO: heresy! two clones! I think the system prompt could take references since it's only supposed to get rendered.
+            user.clone(),
+            SystemPrompt::builder()
+                .user(user.clone())
+                .build()
+                .render()?,
+        ),
     };
 
     if let Some(text) = msg.text() {
