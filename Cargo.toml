@@ -24,3 +24,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 derive_more = { version = "2", features = ["constructor"] }
 dynosaur = { version = "0.3" }
 trait-variant = { version = "0.1" }
+isolang = { version = "2", features = ["english_names"] }
+itertools = { version = "0.14" }
+bon = { version = "3" }
+
+[dev-dependencies]
+insta = { version = "1" }
