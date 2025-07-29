@@ -8,6 +8,10 @@
       url = "github:numtide/flake-utils";
       inputs.systems.follows = "systems";
     };
+    naersk = {
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     treefmt = {
       url = "github:numtide/treefmt-nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -31,6 +35,7 @@
       treefmt,
       pre-commit,
       nix-checks,
+      naersk,
       ...
     }:
     utils.lib.eachDefaultSystem (
@@ -54,6 +59,11 @@
             treefmt = treefmt-build.wrapper;
           };
         };
+        naersk' = pkgs.callPackage naersk {
+          cargo = rustPkgs;
+          rustc = rustPkgs;
+          clippy = rustPkgs;
+        };
         inherit (nix-checks.lib.${system}) checks rustChecks;
       in
       {
@@ -67,6 +77,11 @@
 
         # for nix fmt
         formatter = treefmt-build.wrapper;
+
+        packages.default = naersk'.buildPackage {
+          src = ./.;
+          mode = "build";
+        };
 
         devShells.default =
           with pkgs;
