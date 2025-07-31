@@ -29,11 +29,13 @@ in
       description = "Whitelist of telegram user IDs that will be allowed to use the bot";
     };
 
+    # MAYBE: should maybe be telegramTokenPath?
     telegramToken = lib.mkOption {
       type = lib.types.path;
       description = "Path to a file containing the Telegram token";
     };
 
+    # MAYBE: should maybe be openrouterTokenPath?
     openrouterToken = lib.mkOption {
       type = lib.types.path;
       description = "Path to a file containing the OpenRouter token";
