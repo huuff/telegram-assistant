@@ -111,7 +111,7 @@
     // {
       nixosModules = {
         # TODO: this only works for my architecture! That's pretty bad, should I pass the package in an overlay?
-        default = import ./service.nix { telegram-assistant = self.x86-64_linux.packages.default; };
+        default = import ./service.nix { telegram-assistant = self.packages.x86_64-linux.default; };
       };
     };
 }
