@@ -50,6 +50,11 @@ in
 
       path = [ telegram-assistant ];
 
+      environment = {
+        RUST_LOG = cfg.logLevel;
+        ALLOWED_USERS = lib.mkIf (cfg.allowedUsers != [ ]) (lib.concatStringsSep "," cfg.allowedUsers);
+      };
+
       serviceConfig = {
         Restart = "always";
 
@@ -58,10 +63,6 @@ in
           "TELOXIDE_TOKEN:${cfg.telegramToken}" # TODO: this env var should be renamed to TELEGRAM_TOKEN right?
           "OPENROUTER_TOKEN:${cfg.openrouterToken}"
         ];
-        Environment = {
-          RUST_LOG = cfg.logLevel;
-          ALLOWED_USERS = lib.mkIf (cfg.allowedUsers != [ ]) (lib.concatStringsSep "," cfg.allowedUsers);
-        };
       };
     };
   };
