@@ -48,8 +48,6 @@ in
 
       wantedBy = [ "multi-user.target" ];
 
-      path = [ telegram-assistant ];
-
       environment = {
         RUST_LOG = cfg.logLevel;
         ALLOWED_USERS = lib.mkIf (cfg.allowedUsers != [ ]) (lib.concatStringsSep "," cfg.allowedUsers);
@@ -58,7 +56,7 @@ in
       serviceConfig = {
         Restart = "always";
 
-        ExecStart = "telegram-assistant";
+        ExecStart = "${telegram-assistant}/bin/telegram-assistant";
         LoadCredential = [
           "TELOXIDE_TOKEN:${cfg.telegramToken}" # TODO: this env var should be renamed to TELEGRAM_TOKEN right?
           "OPENROUTER_TOKEN:${cfg.openrouterToken}"
