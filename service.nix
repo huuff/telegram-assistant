@@ -2,6 +2,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 let
@@ -56,10 +57,12 @@ in
       serviceConfig = {
         Restart = "always";
 
-        ExecStart = "${telegram-assistant}/bin/telegram-assistant";
+        ExecStart = ''
+          ${pkgs.bash}/bin/bash -c 'TELEGRAM_TOKEN="$(cat $CREDENTIALS_DIRECTORY/telegram_token)" OPENROUTER_TOKEN="$(cat $CREDENTIALS_DIRECTORY/openrouter_token)" ${telegram-assistant}/bin/telegram-assistant'
+        '';
         LoadCredential = [
-          "TELOXIDE_TOKEN:${cfg.telegramToken}" # TODO: this env var should be renamed to TELEGRAM_TOKEN right?
-          "OPENROUTER_TOKEN:${cfg.openrouterToken}"
+          "telegram_token:${cfg.telegramToken}" # TODO: this env var should be renamed to TELEGRAM_TOKEN right?
+          "openrouter_token:${cfg.openrouterToken}"
         ];
       };
     };
