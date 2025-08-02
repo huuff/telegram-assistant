@@ -58,7 +58,7 @@ in
         Restart = "always";
 
         ExecStart = ''
-          ${pkgs.bash}/bin/bash -c 'TELEGRAM_TOKEN="$(cat $CREDENTIALS_DIRECTORY/telegram_token)" OPENROUTER_TOKEN="$(cat $CREDENTIALS_DIRECTORY/openrouter_token)" ${telegram-assistant}/bin/telegram-assistant'
+          ${pkgs.bash}/bin/bash -c 'TELOXIDE_TOKEN="$(cat $CREDENTIALS_DIRECTORY/telegram_token)" OPENROUTER_TOKEN="$(cat $CREDENTIALS_DIRECTORY/openrouter_token)" ${telegram-assistant}/bin/telegram-assistant'
         '';
         LoadCredential = [
           "telegram_token:${cfg.telegramToken}" # TODO: this env var should be renamed to TELEGRAM_TOKEN right?
