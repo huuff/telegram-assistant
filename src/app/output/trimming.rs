@@ -1,5 +1,7 @@
 use crate::domain::chat::ChatHistory;
 
+#[trait_variant::make(Send)]
+#[dynosaur::dynosaur(pub DynChatTrimmingService = dyn(box) ChatTrimmingService)]
 pub trait ChatTrimmingService: Send + Sync {
-    fn trim(&self, chat_history: ChatHistory) -> ChatHistory;
+    async fn trim(&self, chat_history: ChatHistory) -> ChatHistory;
 }

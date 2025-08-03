@@ -6,7 +6,6 @@ nestify::nest! {
         pub user: User,
         pub system_prompt: String,
         pub messages: Vec<pub struct ChatMessage {
-            #>[derive(Copy)]
             pub sender: pub enum ChatMessageSender { User, Assistant },
             pub content: String,
         }>
@@ -22,14 +21,16 @@ impl ChatHistory {
         }
     }
 
-    pub fn push_user_message(&mut self, message: impl ToString) {
-        self.messages.push(ChatMessage {
-            sender: ChatMessageSender::User,
-            content: message.to_string(),
-        })
-    }
-
     pub fn push_message(&mut self, message: ChatMessage) {
         self.messages.push(message)
+    }
+}
+
+impl ChatMessage {
+    pub fn new_from_user(msg: String) -> Self {
+        Self {
+            sender: ChatMessageSender::User,
+            content: msg,
+        }
     }
 }

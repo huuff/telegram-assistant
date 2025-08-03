@@ -7,7 +7,7 @@ use crate::{app::output::trimming::ChatTrimmingService, domain::chat::ChatHistor
 pub struct ChatResettingService;
 
 impl ChatTrimmingService for ChatResettingService {
-    fn trim(&self, history: ChatHistory) -> ChatHistory {
+    async fn trim(&self, history: ChatHistory) -> ChatHistory {
         ChatHistory::new(
             history.user.clone(),
             // TODO: it'd be cool to make this configurable, perhaps there should be a
