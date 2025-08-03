@@ -7,14 +7,14 @@ pub struct InMemoryChatRepository {
 }
 
 impl ChatRepository for InMemoryChatRepository {
-    fn find(&self, id: i64) -> Result<Option<ChatHistory>, anyhow::Error> {
+    async fn find(&self, id: i64) -> Result<Option<ChatHistory>, anyhow::Error> {
         // TODO: this will break forever if the lock is poisoned right? gotta fix that
         let store = self.store.lock().expect("should never get poisoned");
 
         Ok(store.get(&id).cloned())
     }
 
-    fn save(&self, id: i64, chat: ChatHistory) -> Result<(), anyhow::Error> {
+    async fn save(&self, id: i64, chat: ChatHistory) -> Result<(), anyhow::Error> {
         let mut store = self.store.lock().expect("should never get poisoned");
 
         store.insert(id, chat);
